@@ -1,110 +1,65 @@
 import random
 import time
-import threading
 from datetime import datetime, timedelta
 import config
 from logger import log_info, log_success, log_error
-from boost_checker import check_single_account
-
+from boost_checker import check_all_accounts
+from nitro_checker import check_all_nitro
+from supabase_client import save_account_data
 
 class Scheduler:
-    """جدولة الفحص الموزع على مدار اليوم"""
-
     def __init__(self):
         self.running = True
-        # ✅ الإصلاح 4: check_history يخزن timestamp الفحص القادم لكل token
-        self.check_history: dict[str, float] = {}
+        self.next_run = None
 
-    def get_next_check_time(self, index: int, total: int) -> float:
-        """
-        حساب وقت الفحص التالي لحساب معين
-        يوزع الحسابات على مدار اليوم
-        """
-        # توزيع الحسابات على 24 ساعة
-        base_hour = (index / total) * 24
-
-        # إضافة عشوائية (± ساعتين)
-        random_offset = random.uniform(-2, 2)
-        hour = (base_hour + random_offset) % 24
-
+    def schedule_next(self):
+        """جدولة الفحص التالي بعد 24 ساعة + عشوائية"""
         now = datetime.now()
-
-        # حساب وقت الفحص التالي في اليوم الحالي
-        next_time = now.replace(
-            hour=int(hour),
-            minute=random.randint(0, 59),
-            second=0,
-            microsecond=0
-        )
-
-        # ✅ الإصلاح 3: timedelta بدل replace(day=+1) لتجنب كسر نهاية الشهر
-        if next_time <= now:
-            next_time += timedelta(days=1)
-
-        return next_time.timestamp()
-
-    def run_single_check(self, token: str, index: int, total: int):
-        """تنفيذ فحص لحساب واحد"""
-        log_info(f"🔄 بدء فحص الحساب {index + 1}/{total}")
-
-        try:
-            result = check_single_account(token)
-
-            if result and result.get("status") == "ready":
-                from notifier import send_notification
-                send_notification(result)
-                log_success(f"✅ {result.get('username')} جاهز للضرب!")
-            elif result and result.get("error"):
-                log_error(f"❌ فشل فحص {token[:15]}: {result['error']}")
-            else:
-                log_info(f"📊 {result.get('username')}: {result.get('message', '')}")
-
-        except Exception as e:
-            log_error(f"❌ خطأ في فحص الحساب: {e}")
+        next_time = now + timedelta(hours=24, minutes=random.randint(0, 59))
+        self.next_run = next_time.timestamp()
+        log_info(f"📅 الفحص القادم: {next_time.strftime('%Y-%m-%d %H:%M')}")
 
     def run_loop(self):
-        """الحلقة الرئيسية للجدولة"""
-        log_info("🚀 بدأ تشغيل Scheduler")
-
-        tokens = config.SELF_TOKENS.copy()
-        total = len(tokens)
-
-        # ✅ الإصلاح 4: نجدول كل حساب مرة واحدة عند البداية
-        for i, token in enumerate(tokens):
-            self.check_history[token] = self.get_next_check_time(i, total)
-            log_info(
-                f"📅 جُدول الحساب {i + 1}: "
-                f"{datetime.fromtimestamp(self.check_history[token]).strftime('%H:%M')}"
-            )
-
+        log_info("🚀 بدأ تشغيل Scheduler (كل 24 ساعة)")
+        self.schedule_next()
         while self.running:
             now = time.time()
-
-            for i, token in enumerate(tokens):
-                next_check = self.check_history.get(token, 0)
-
-                # ✅ الإصلاح 4: نتحقق من check_history وليس get_next_check_time في كل دورة
-                if next_check <= now:
-                    log_info(f"⏰ حان وقت فحص الحساب {i + 1}")
-                    self.run_single_check(token, i, total)
-
-                    # نجدول الفحص القادم بعد 24 ساعة + عشوائية
-                    next_interval = timedelta(
-                        hours=22 + random.uniform(0, 4),
-                        minutes=random.randint(0, 59)
-                    )
-                    self.check_history[token] = now + next_interval.total_seconds()
-
-                    next_dt = datetime.fromtimestamp(self.check_history[token])
-                    log_info(f"📅 الفحص القادم للحساب {i + 1}: {next_dt.strftime('%Y-%m-%d %H:%M')}")
-
-                    # توقف بين الحسابات
-                    time.sleep(random.uniform(5, 15))
-
-            # نتحقق كل دقيقة
+            if now >= self.next_run:
+                log_info("⏰ حان وقت الفحص الدوري!")
+                self.run_checks()
+                self.schedule_next()
             time.sleep(60)
 
+    def run_checks(self):
+        """تنفيذ الفحص الكامل (Boost + Nitro) لجميع الحسابات"""
+        log_info("🔄 بدء الفحص الدوري الشامل...")
+        boost_results = check_all_accounts()
+        nitro_results = check_all_nitro()
+        # دمج النتائج وحفظها في Supabase
+        for b in boost_results:
+            if "error" in b:
+                continue
+            # نبحث عن النيترو المقابل
+            nitro = next((n for n in nitro_results if n.get("user_id") == b.get("user_id")), {})
+            data = {
+                "username": b.get("username"),
+                "user_id": b.get("user_id"),
+                "status": b.get("status"),
+                "cooldown_ends": b.get("cooldown_ends"),
+                "last_check": b.get("last_check"),
+                "server_id": b.get("server_id"),
+                "nitro_type": nitro.get("nitro_type"),
+                "nitro_status": nitro.get("status"),
+                "nitro_expires_at": nitro.get("expires_at"),
+                "nitro_days_left": nitro.get("days_left"),
+                "nitro_last_check": nitro.get("checked_at"),
+            }
+            # نبحث عن التوكن الأصلي
+            token = next((t for t in config.SELF_TOKENS if t.startswith(b.get("token_preview", "").replace("...", ""))), None)
+            if token:
+                save_account_data(token, data)
+        log_success("✅ انتهى الفحص الدوري الشامل")
+
     def stop(self):
-        """إيقاف الجدولة"""
         self.running = False
         log_info("🛑 تم إيقاف Scheduler")

@@ -1,77 +1,45 @@
-#!/usr/bin/env python3
-"""
-Nebula - Discord Boost Monitor
-مراقبة حسابات ديسكورد ومعرفة وقت جاهزية الـBoost
-"""
-
 import threading
 import time
-from flask import Flask
-import config
-from logger import log_info, log_success, log_error
+from api import run_api
+from self_bot import run_self_bot, stop_self_bot
+from bot_commands import run_bot
+from logger import log_info, log_error, log_success
 from supabase_client import init_supabase
-from scheduler import Scheduler
+import config
 
-# ===== Flask (لـ UptimeRobot) =====
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Nebula is running!", 200
-
-@app.route('/ping')
-def ping():
-    return "PONG", 200
-
-@app.route('/status')
-def status():
-    return {
-        "status":   "online",
-        "accounts": len(config.SELF_TOKENS),
-        "uptime":   round(time.time() - start_time, 2)
-    }, 200
-
-def run_flask():
-    app.run(host='0.0.0.0', port=8080, use_reloader=False)
-
-# ===== المتغيرات العامة =====
-start_time = time.time()
-scheduler  = Scheduler()   # global عشان bot_commands يقدر يوصله
-
-# ===== التشغيل الرئيسي =====
 if __name__ == "__main__":
     print("""
     ╔══════════════════════════════════════╗
-    ║        🚀 NEBULA v2.0               ║
+    ║        🚀 NEBULA v3.0               ║
     ║    Discord Boost Monitor            ║
     ╚══════════════════════════════════════╝
     """)
-
+    
     log_info(f"📊 عدد الحسابات: {len(config.SELF_TOKENS)}")
     log_info(f"🔒 السيرفر المسموح: {config.ALLOWED_GUILD_ID}")
     log_info(f"⏱️ التأخير: {config.MIN_DELAY_SECONDS}-{config.MAX_DELAY_SECONDS}ث")
     log_info(f"🔑 OWNER_ID: {config.OWNER_ID}")
+    log_info("🔄 وضع الفحص: كل 24 ساعة مع توزيع عشوائي")
 
-    # ===== تهيئة Supabase =====
+    # Supabase
     init_supabase()
 
-    # ===== Flask Thread =====
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    log_success("✅ Flask يعمل على منفذ 8080")
+    # تشغيل API في خيط منفصل
+    api_thread = threading.Thread(target=run_api, daemon=True)
+    api_thread.start()
+    log_success("✅ API يعمل على منفذ 5000")
 
-    # ===== Scheduler Thread =====
-    scheduler_thread = threading.Thread(target=scheduler.run_loop, daemon=True)
-    scheduler_thread.start()
-    log_success("✅ Scheduler يعمل")
+    # تشغيل Self-Bot في خيط منفصل
+    self_bot_thread = threading.Thread(target=run_self_bot, daemon=True)
+    self_bot_thread.start()
+    log_success("✅ Self-Bot يعمل في الخلفية")
 
-    # ===== Bot Commands (رئيسي - يبلوك الـ loop) =====
+    # تشغيل البوت العادي في الخيط الرئيسي
     try:
-        from bot_commands import run_bot
         run_bot()
     except KeyboardInterrupt:
-        log_info("🛑 تم إيقاف Nebula")
-        scheduler.stop()
+        log_info("🛑 تم إيقاف Nebula بواسطة المستخدم")
+        stop_self_bot()
     except Exception as e:
         log_error(f"❌ خطأ غير متوقع: {e}")
-        scheduler.stop()
+        stop_self_bot()
