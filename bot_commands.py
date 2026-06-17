@@ -46,8 +46,16 @@ class NebulaBotClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
-        log_success("✅ تم مزامنة Slash Commands")
+        # لو عندنا GUILD_ID نسجل فيه مباشرة (فوري)
+        # لو ما عندنا نسجل global (يأخذ حتى ساعة)
+        if config.ALLOWED_GUILD_ID:
+            guild = discord.Object(id=config.ALLOWED_GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            log_success(f"✅ Commands سُجِّلت في السيرفر {config.ALLOWED_GUILD_ID} (فوري)")
+        else:
+            await self.tree.sync()
+            log_success("✅ Commands سُجِّلت Global (قد تأخذ حتى ساعة)")
 
     async def on_ready(self):
         log_success(f"✅ البوت شغّال: {self.user} | OWNER: {config.OWNER_ID}")

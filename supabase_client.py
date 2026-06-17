@@ -18,8 +18,14 @@ def init_supabase():
         supabase = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
         log_info("✅ تم الاتصال بـ Supabase بنجاح")
         return supabase
+    except TypeError as e:
+        # مشكلة proxy في بعض إصدارات supabase
+        log_error(f"❌ فشل الاتصال بـ Supabase (TypeError): {e}")
+        log_info("⚠️ البوت سيكمل بدون Supabase")
+        return None
     except Exception as e:
-        log_error(f"فشل الاتصال بـ Supabase: {e}")
+        log_error(f"❌ فشل الاتصال بـ Supabase: {e}")
+        log_info("⚠️ البوت سيكمل بدون Supabase")
         return None
 
 def save_account_data(token: str, data: dict):
