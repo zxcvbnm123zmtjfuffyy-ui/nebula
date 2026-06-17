@@ -4,13 +4,9 @@ import config
 from logger import log_info, log_error
 
 def send_webhook(embed_data: dict):
-    """إرسال إمبد إلى ويب هوك الإشعارات"""
     if not config.WEBHOOK_URL:
         return
-    payload = {
-        "username": "Nebula",
-        "embeds": [embed_data]
-    }
+    payload = {"username": "Nebula", "embeds": [embed_data]}
     try:
         resp = requests.post(config.WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code in (200, 204):
@@ -21,7 +17,6 @@ def send_webhook(embed_data: dict):
         log_error(f"فشل إرسال الإشعار: {e}")
 
 def send_ready_notification(username: str, user_id: str, cooldown_ts: int = None):
-    """إشعار حساب جاهز"""
     embed = {
         "title": "🚀 حساب جاهز للبوست!",
         "description": f"الحساب **{username}** أصبح جاهزاً.",
@@ -38,7 +33,6 @@ def send_ready_notification(username: str, user_id: str, cooldown_ts: int = None
     send_webhook(embed)
 
 def send_waiting_notification(username: str, user_id: str, cooldown_ts: int, remaining_text: str):
-    """إشعار حساب في الانتظار"""
     embed = {
         "title": "⏳ حساب في فترة التبريد",
         "description": f"الحساب **{username}** لا يزال في الانتظار.",

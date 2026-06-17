@@ -2,39 +2,42 @@ import discord
 from discord.ext import commands
 import config
 from boost_checker import check_account, check_all_accounts
+from nitro_checker import check_nitro, check_all_nitro
 from notifier import send_ready_notification, send_waiting_notification
-from logger import log_info, log_error, log_success
+from logger import log_info
 
-# ===== إنشاء البوت =====
+# ===== إعداد البوت =====
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
+bot.remove_command('help')  # إزالة الأمر الافتراضي
 
-# ===== حدث جاهزية البوت =====
+# ===== حدث الجاهزية =====
 @bot.event
 async def on_ready():
-    print(f"✅ البوت جاهز: {bot.user} (ID: {bot.user.id})")
-    await bot.change_presence(activity=discord.Game(name="!help"))
+    print(f"✅ البوت جاهز: {bot.user}")
+    await bot.change_presence(activity=discord.Game(name="!مساعدة"))
 
 # ===== التحقق من المالك =====
 def is_owner(ctx):
     return ctx.author.id == config.OWNER_ID
 
 # ===== أمر المساعدة =====
-@bot.command(name="help")
+@bot.command(name="مساعدة")
 async def help_cmd(ctx):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
-    embed = discord.Embed(title="📋 أوامر Nebula", color=0x00bfff)
-    embed.add_field(name="!status", value="عرض حالة جميع الحسابات", inline=False)
-    embed.add_field(name="!check <ID>", value="فحص حساب محدد بواسطة User ID", inline=False)
-    embed.add_field(name="!list", value="عرض قائمة مختصرة لجميع الحسابات", inline=False)
-    embed.add_field(name="!notify <ID>", value="إرسال إشعار لحساب معين (يدوياً)", inline=False)
+    embed = discord.Embed(title="📋 أوامر Nebula (عربي)", color=0x00bfff)
+    embed.add_field(name="!حالة", value="عرض حالة جميع الحسابات", inline=False)
+    embed.add_field(name="!فحص <ID>", value="فحص حساب محدد بواسطة User ID", inline=False)
+    embed.add_field(name="!قائمة", value="عرض قائمة مختصرة", inline=False)
+    embed.add_field(name="!نيترو", value="عرض حالة Nitro لجميع الحسابات", inline=False)
+    embed.add_field(name="!إشعار <ID>", value="إرسال إشعار لحساب معين (يدوياً)", inline=False)
     embed.set_footer(text="جميع الأوامر خاصة بالمالك فقط")
     await ctx.send(embed=embed)
 
-# ===== أمر عرض الحالة الكاملة =====
-@bot.command(name="status")
+# ===== أمر الحالة =====
+@bot.command(name="حالة")
 async def status_cmd(ctx):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
@@ -47,26 +50,20 @@ async def status_cmd(ctx):
     )
     for r in results:
         if "error" in r:
-            embed.add_field(
-                name="❌ خطأ",
-                value=r["error"],
-                inline=False
-            )
+            embed.add_field(name="❌ خطأ", value=r["error"], inline=False)
         else:
-            status_emoji = "✅" if r["status"] == "ready" else "⏳"
-            cooldown_text = ""
-            if r.get("cooldown_timestamp"):
-                cooldown_text = f"\nينتهي: <t:{r['cooldown_timestamp']}:R>"
+            emoji = "✅" if r["status"] == "ready" else "⏳"
+            cooldown = f"\nينتهي: <t:{r['cooldown_timestamp']}:R>" if r.get("cooldown_timestamp") else ""
             embed.add_field(
-                name=f"{status_emoji} {r['username']}",
-                value=f"🆔 `{r['user_id']}`\n{r['message']}{cooldown_text}",
+                name=f"{emoji} {r['username']}",
+                value=f"🆔 `{r['user_id']}`\n{r['message']}{cooldown}",
                 inline=False
             )
     embed.set_footer(text=f"عدد الحسابات: {len(results)}")
     await ctx.send(embed=embed)
 
-# ===== أمر فحص حساب محدد =====
-@bot.command(name="check")
+# ===== أمر الفحص =====
+@bot.command(name="فحص")
 async def check_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
@@ -93,8 +90,8 @@ async def check_cmd(ctx, user_id: str):
             return
     await ctx.send(f"❌ لم أجد حساباً بـ ID: `{user_id}`")
 
-# ===== أمر قائمة مختصرة =====
-@bot.command(name="list")
+# ===== أمر القائمة =====
+@bot.command(name="قائمة")
 async def list_cmd(ctx):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
@@ -115,8 +112,32 @@ async def list_cmd(ctx):
     embed.set_footer(text=f"عدد الحسابات: {len(results)}")
     await ctx.send(embed=embed)
 
-# ===== أمر إرسال إشعار يدوي =====
-@bot.command(name="notify")
+# ===== أمر النيترو =====
+@bot.command(name="نيترو")
+async def nitro_cmd(ctx):
+    if not is_owner(ctx):
+        return await ctx.send("❌ غير مصرح لك.")
+    await ctx.send("⏳ جاري جلب بيانات Nitro...")
+    results = check_all_nitro()
+    embed = discord.Embed(
+        title="💎 Nebula — حالة Nitro",
+        color=0xf47fff,
+        timestamp=discord.utils.utcnow()
+    )
+    for r in results:
+        if "error" in r:
+            embed.add_field(name="❌ خطأ", value=r["error"], inline=False)
+        else:
+            embed.add_field(
+                name=r["username"],
+                value=f"🆔 `{r['user_id']}`\n{r['message']}",
+                inline=False
+            )
+    embed.set_footer(text=f"عدد الحسابات: {len(results)}")
+    await ctx.send(embed=embed)
+
+# ===== أمر الإشعار =====
+@bot.command(name="إشعار")
 async def notify_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
