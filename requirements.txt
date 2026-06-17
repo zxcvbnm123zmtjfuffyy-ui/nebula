@@ -1,8 +1,7 @@
 discord.py-self==2.1.0
-discord.py==2.3.2
 Flask==3.0.3
 requests==2.31.0
 python-dotenv==1.0.1
-supabase==2.3.1
+supabase==2.10.0
 httpx==0.26.0
 postgrest==0.16.0
