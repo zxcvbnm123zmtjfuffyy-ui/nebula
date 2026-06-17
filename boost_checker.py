@@ -1,9 +1,9 @@
 import requests
 import random
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import config
-from logger import log_info, log_warning, log_error, log_success
+from logger import log_info, log_warning, log_error
 
 _account_cache = {}
 
@@ -71,14 +71,20 @@ def check_account(token: str) -> dict:
     if slots is None:
         return {"error": "فشل جلب بيانات Boost"}
 
+    # جلب الصورة
+    avatar_hash = info.get("avatar")
+    avatar_url = f"https://cdn.discordapp.com/avatars/{info['id']}/{avatar_hash}.png" if avatar_hash else None
+
     active = [s for s in slots if s.get("cooldown_ends_at")]
     if not active:
         return {
             "username": info["username"],
             "user_id": info["id"],
+            "avatar_url": avatar_url,
             "status": "ready",
-            "message": "✅ جاهز للضرب!",
+            "message": "✅ **جاهز للضرب!**",
             "cooldown_timestamp": None,
+            "last_boost_timestamp": None,
             "server_id": None
         }
 
@@ -88,14 +94,20 @@ def check_account(token: str) -> dict:
     except:
         end_time = datetime.fromisoformat(cooldown_end)
 
+    # حساب آخر ضربة (ناقص 7 أيام)
+    last_boost_time = end_time - timedelta(days=7)
+    last_boost_ts = int(last_boost_time.timestamp())
+
     now = datetime.now(timezone.utc)
     if end_time <= now:
         return {
             "username": info["username"],
             "user_id": info["id"],
+            "avatar_url": avatar_url,
             "status": "ready",
-            "message": "✅ جاهز للضرب!",
+            "message": "✅ **جاهز للضرب!**",
             "cooldown_timestamp": int(end_time.timestamp()),
+            "last_boost_timestamp": last_boost_ts,
             "server_id": active[0].get("guild_id")
         }
     else:
@@ -107,9 +119,11 @@ def check_account(token: str) -> dict:
         return {
             "username": info["username"],
             "user_id": info["id"],
+            "avatar_url": avatar_url,
             "status": "waiting",
-            "message": f"⏳ متبقي {text}",
+            "message": f"⏳ **متبقي** {text}",
             "cooldown_timestamp": int(end_time.timestamp()),
+            "last_boost_timestamp": last_boost_ts,
             "server_id": active[0].get("guild_id")
         }
 

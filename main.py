@@ -35,7 +35,7 @@ if __name__ == "__main__":
     ╔══════════════════════════════════════╗
     ║        🚀 NEBULA v4.0               ║
     ║    Discord Boost Monitor            ║
-    ║    (أوامر عربية + ويب)             ║
+    ║    (أوامر عربية + ويب + إمبدات)   ║
     ╚══════════════════════════════════════╝
     """)
     
@@ -43,11 +43,9 @@ if __name__ == "__main__":
     log_info(f"🔒 السيرفر المسموح: {config.ALLOWED_GUILD_ID}")
     log_info(f"⏱️ التأخير بين الطلبات: {config.MIN_DELAY_SECONDS}-{config.MAX_DELAY_SECONDS} ثانية")
     
-    # تشغيل Flask في خيط منفصل
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     log_success("✅ Flask يعمل على منفذ 8080")
     
-    # تشغيل البوت في الخيط الرئيسي
     log_info("🤖 تشغيل البوت...")
     run_bot()

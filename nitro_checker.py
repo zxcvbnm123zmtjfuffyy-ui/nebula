@@ -3,7 +3,7 @@ import random
 import time
 from datetime import datetime, timezone
 import config
-from logger import log_info, log_warning, log_error, log_success
+from logger import log_info, log_warning, log_error
 from boost_checker import get_account_info
 
 def get_headers(token: str) -> dict:
@@ -47,48 +47,44 @@ def check_nitro(token: str) -> dict:
     info = get_account_info(token)
     if not info:
         return {"error": "فشل جلب معلومات الحساب"}
+
+    premium_type = info.get("premium_type", 0)
+    nitro_map = {
+        0: {"name": "بدون Nitro", "emoji": "⚪", "color": 0x747f8d},
+        1: {"name": "Nitro Classic", "emoji": "💜", "color": 0x7289da},
+        2: {"name": "Nitro", "emoji": "💎", "color": 0xf47fff},
+        3: {"name": "Nitro Basic", "emoji": "🔵", "color": 0x5865f2},
+    }
+    nitro_info = nitro_map.get(premium_type, nitro_map[0])
+
+    expires_ts = None
+    days_left = None
     subs = get_nitro_subscriptions(token)
-    if subs is None:
-        return {"error": "فشل جلب بيانات Nitro"}
+    if subs:
+        active = [s for s in subs if s.get("status") in ("active", "past_due")]
+        if active:
+            expires_raw = active[0].get("current_period_end")
+            if expires_raw:
+                if isinstance(expires_raw, (int, float)):
+                    expires_dt = datetime.fromtimestamp(expires_raw, tz=timezone.utc)
+                else:
+                    expires_dt = datetime.fromisoformat(str(expires_raw).replace("Z", "+00:00"))
+                expires_ts = int(expires_dt.timestamp())
+                days_left = (expires_dt - datetime.now(timezone.utc)).days
 
-    active = [s for s in subs if s.get("status") in ("active", "past_due")]
-    if not active:
-        return {
-            "username": info["username"],
-            "user_id": info["id"],
-            "has_nitro": False,
-            "message": "⚪ بدون Nitro"
-        }
-
-    sub = active[0]
-    expires_raw = sub.get("current_period_end")
-    if expires_raw:
-        if isinstance(expires_raw, (int, float)):
-            expires_dt = datetime.fromtimestamp(expires_raw, tz=timezone.utc)
-        else:
-            expires_dt = datetime.fromisoformat(str(expires_raw).replace("Z", "+00:00"))
-        now = datetime.now(timezone.utc)
-        days_left = (expires_dt - now).days
-        if days_left <= 7:
-            msg = f"⚠️ ينتهي قريباً <t:{int(expires_dt.timestamp())}:R>"
-        else:
-            msg = f"✅ ينتهي <t:{int(expires_dt.timestamp())}:R>"
-        return {
-            "username": info["username"],
-            "user_id": info["id"],
-            "has_nitro": True,
-            "nitro_type": "Nitro",
-            "days_left": days_left,
-            "expires_timestamp": int(expires_dt.timestamp()),
-            "message": msg
-        }
+    warn = days_left is not None and days_left <= 7
 
     return {
         "username": info["username"],
         "user_id": info["id"],
-        "has_nitro": True,
-        "nitro_type": "Nitro",
-        "message": "💎 Nitro نشط (بدون تاريخ انتهاء)"
+        "has_nitro": premium_type > 0,
+        "nitro_type": nitro_info["name"],
+        "nitro_emoji": nitro_info["emoji"],
+        "nitro_color": nitro_info["color"],
+        "expires_timestamp": expires_ts,
+        "days_left": days_left,
+        "warn": warn,
+        "message": f"{nitro_info['emoji']} {nitro_info['name']}" + (f" (ينتهي <t:{expires_ts}:R>)" if expires_ts else " (نشط)")
     }
 
 def check_all_nitro() -> list:
