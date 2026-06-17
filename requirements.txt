@@ -1,4 +1,4 @@
-discord.py-self==2.2.0
+discord.py-self==2.1.0
 discord.py==2.3.2
 Flask==3.0.3
 requests==2.31.0
