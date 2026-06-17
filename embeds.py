@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Dict
 
 def build_boost_embed(result: Dict) -> discord.Embed:
-    """بناء إمبد احترافي لنتيجة فحص Boost"""
+    """بناء إمبد احترافي مع Markdown لنتيجة فحص Boost"""
     username = result.get("username", "Unknown")
     user_id = result.get("user_id", "???")
     avatar_url = result.get("avatar_url")
@@ -13,7 +13,6 @@ def build_boost_embed(result: Dict) -> discord.Embed:
     last_boost_ts = result.get("last_boost_timestamp")
     server_id = result.get("server_id")
 
-    # اختيار اللون
     color = 0x00ff7f if status == "ready" else 0xff4444
 
     embed = discord.Embed(
@@ -22,11 +21,9 @@ def build_boost_embed(result: Dict) -> discord.Embed:
         timestamp=datetime.now(timezone.utc)
     )
 
-    # الصورة الرمزية
     if avatar_url:
         embed.set_thumbnail(url=avatar_url)
 
-    # الحقول الأساسية
     embed.add_field(
         name="👤 **الحساب**",
         value=f"**{username}**\n`{user_id}`",
@@ -38,7 +35,6 @@ def build_boost_embed(result: Dict) -> discord.Embed:
         inline=True
     )
 
-    # آخر ضربة
     if last_boost_ts:
         embed.add_field(
             name="📅 **آخر ضربة**",
@@ -48,11 +44,10 @@ def build_boost_embed(result: Dict) -> discord.Embed:
     else:
         embed.add_field(
             name="📅 **آخر ضربة**",
-            value="❌ لا توجد",
+            value="❌ **لا توجد**",
             inline=False
         )
 
-    # وقت الانتهاء (للانتظار)
     if cooldown_ts:
         embed.add_field(
             name="⏳ **ينتهي**",
@@ -60,7 +55,6 @@ def build_boost_embed(result: Dict) -> discord.Embed:
             inline=True
         )
 
-    # السيرفر
     if server_id:
         embed.add_field(
             name="🏠 **السيرفر**",
@@ -68,11 +62,10 @@ def build_boost_embed(result: Dict) -> discord.Embed:
             inline=True
         )
 
-    # Progress Bar (إذا كان في انتظار)
     if status == "waiting" and cooldown_ts:
         now = datetime.now(timezone.utc).timestamp()
         remaining = cooldown_ts - now
-        total = 604800  # 7 أيام
+        total = 604800
         progress = max(0, min(100, int(((total - remaining) / total) * 100)))
         bar_length = 20
         filled = int(progress / 100 * bar_length)
@@ -83,7 +76,7 @@ def build_boost_embed(result: Dict) -> discord.Embed:
         time_text = f"{days}ي {hours}س {minutes}د"
         embed.add_field(
             name="📊 **التقدم**",
-            value=f"`{bar}` **{progress}%**\n⏳ متبقي: `{time_text}`",
+            value=f"`{bar}` **{progress}%**\n⏳ **متبقي:** `{time_text}`",
             inline=False
         )
 
@@ -92,7 +85,7 @@ def build_boost_embed(result: Dict) -> discord.Embed:
 
 
 def build_nitro_embed(result: Dict) -> discord.Embed:
-    """بناء إمبد Nitro احترافي"""
+    """بناء إمبد Nitro مع Markdown"""
     username = result.get("username", "Unknown")
     user_id = result.get("user_id", "???")
     nitro_type = result.get("nitro_type", "بدون Nitro")
@@ -116,7 +109,7 @@ def build_nitro_embed(result: Dict) -> discord.Embed:
     )
     embed.add_field(
         name="💎 **النوع**",
-        value=f"{nitro_emoji} {nitro_type}",
+        value=f"{nitro_emoji} **{nitro_type}**",
         inline=True
     )
 
@@ -135,7 +128,7 @@ def build_nitro_embed(result: Dict) -> discord.Embed:
     else:
         embed.add_field(
             name="📅 **الانتهاء**",
-            value="غير محدد (نشط)",
+            value="**غير محدد (نشط)**",
             inline=False
         )
 

@@ -84,7 +84,7 @@ def check_nitro(token: str) -> dict:
         "expires_timestamp": expires_ts,
         "days_left": days_left,
         "warn": warn,
-        "message": f"{nitro_info['emoji']} {nitro_info['name']}" + (f" (ينتهي <t:{expires_ts}:R>)" if expires_ts else " (نشط)")
+        "message": f"{nitro_info['emoji']} **{nitro_info['name']}**" + (f" (ينتهي <t:{expires_ts}:R>)" if expires_ts else " (نشط)")
     }
 
 def check_all_nitro() -> list:

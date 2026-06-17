@@ -71,7 +71,6 @@ def check_account(token: str) -> dict:
     if slots is None:
         return {"error": "فشل جلب بيانات Boost"}
 
-    # جلب الصورة
     avatar_hash = info.get("avatar")
     avatar_url = f"https://cdn.discordapp.com/avatars/{info['id']}/{avatar_hash}.png" if avatar_hash else None
 
@@ -94,7 +93,6 @@ def check_account(token: str) -> dict:
     except:
         end_time = datetime.fromisoformat(cooldown_end)
 
-    # حساب آخر ضربة (ناقص 7 أيام)
     last_boost_time = end_time - timedelta(days=7)
     last_boost_ts = int(last_boost_time.timestamp())
 
