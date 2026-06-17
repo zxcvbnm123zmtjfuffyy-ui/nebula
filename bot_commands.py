@@ -6,23 +6,19 @@ from nitro_checker import check_nitro, check_all_nitro
 from notifier import send_ready_notification, send_waiting_notification
 from logger import log_info
 
-# ===== إعداد البوت =====
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
-bot.remove_command('help')  # إزالة الأمر الافتراضي
+bot.remove_command('help')
 
-# ===== حدث الجاهزية =====
 @bot.event
 async def on_ready():
     print(f"✅ البوت جاهز: {bot.user}")
     await bot.change_presence(activity=discord.Game(name="!مساعدة"))
 
-# ===== التحقق من المالك =====
 def is_owner(ctx):
     return ctx.author.id == config.OWNER_ID
 
-# ===== أمر المساعدة =====
 @bot.command(name="مساعدة")
 async def help_cmd(ctx):
     if not is_owner(ctx):
@@ -36,7 +32,6 @@ async def help_cmd(ctx):
     embed.set_footer(text="جميع الأوامر خاصة بالمالك فقط")
     await ctx.send(embed=embed)
 
-# ===== أمر الحالة =====
 @bot.command(name="حالة")
 async def status_cmd(ctx):
     if not is_owner(ctx):
@@ -62,7 +57,6 @@ async def status_cmd(ctx):
     embed.set_footer(text=f"عدد الحسابات: {len(results)}")
     await ctx.send(embed=embed)
 
-# ===== أمر الفحص =====
 @bot.command(name="فحص")
 async def check_cmd(ctx, user_id: str):
     if not is_owner(ctx):
@@ -90,7 +84,6 @@ async def check_cmd(ctx, user_id: str):
             return
     await ctx.send(f"❌ لم أجد حساباً بـ ID: `{user_id}`")
 
-# ===== أمر القائمة =====
 @bot.command(name="قائمة")
 async def list_cmd(ctx):
     if not is_owner(ctx):
@@ -112,7 +105,6 @@ async def list_cmd(ctx):
     embed.set_footer(text=f"عدد الحسابات: {len(results)}")
     await ctx.send(embed=embed)
 
-# ===== أمر النيترو =====
 @bot.command(name="نيترو")
 async def nitro_cmd(ctx):
     if not is_owner(ctx):
@@ -136,7 +128,6 @@ async def nitro_cmd(ctx):
     embed.set_footer(text=f"عدد الحسابات: {len(results)}")
     await ctx.send(embed=embed)
 
-# ===== أمر الإشعار =====
 @bot.command(name="إشعار")
 async def notify_cmd(ctx, user_id: str):
     if not is_owner(ctx):
@@ -159,6 +150,5 @@ async def notify_cmd(ctx, user_id: str):
             return
     await ctx.send(f"❌ لم أجد حساباً بـ ID: `{user_id}`")
 
-# ===== تشغيل البوت =====
 def run_bot():
     bot.run(config.BOT_TOKEN)
