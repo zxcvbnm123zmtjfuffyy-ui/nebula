@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 import config
 
+# إعدادات التسجيل في الملف والـ console
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,9 +15,15 @@ logging.basicConfig(
 logger = logging.getLogger("Nebula")
 
 def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
+    """إرسال سجل إلى ويب هوك السجلات (إن وُجد)"""
     if not config.LOG_WEBHOOK_URL:
         return
-    colors = {"INFO": 0x00bfff, "SUCCESS": 0x00ff00, "WARNING": 0xffcc00, "ERROR": 0xff0000}
+    colors = {
+        "INFO": 0x00bfff,
+        "SUCCESS": 0x00ff00,
+        "WARNING": 0xffcc00,
+        "ERROR": 0xff0000,
+    }
     embed = {
         "embeds": [{
             "title": f"📋 Nebula - {level}",

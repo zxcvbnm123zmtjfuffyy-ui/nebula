@@ -1,148 +1,143 @@
 import discord
 from discord.ext import commands
-import requests
 import config
-from logger import log_info
+from boost_checker import check_account, check_all_accounts
+from notifier import send_ready_notification, send_waiting_notification
+from logger import log_info, log_error, log_success
 
-API_URL = "http://localhost:5000"
+# ===== إنشاء البوت =====
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
-
+# ===== حدث جاهزية البوت =====
 @bot.event
 async def on_ready():
-    print(f"✅ البوت العادي جاهز: {bot.user}")
+    print(f"✅ البوت جاهز: {bot.user} (ID: {bot.user.id})")
     await bot.change_presence(activity=discord.Game(name="!help"))
 
+# ===== التحقق من المالك =====
 def is_owner(ctx):
     return ctx.author.id == config.OWNER_ID
 
+# ===== أمر المساعدة =====
 @bot.command(name="help")
 async def help_cmd(ctx):
+    if not is_owner(ctx):
+        return await ctx.send("❌ غير مصرح لك.")
     embed = discord.Embed(title="📋 أوامر Nebula", color=0x00bfff)
     embed.add_field(name="!status", value="عرض حالة جميع الحسابات", inline=False)
-    embed.add_field(name="!check <ID>", value="فحص حساب معين (بواسطة User ID)", inline=False)
-    embed.add_field(name="!nitro", value="عرض حالة Nitro لجميع الحسابات", inline=False)
-    embed.add_field(name="!next", value="أقرب حساب سيصير جاهز", inline=False)
-    embed.add_field(name="!pause", value="إيقاف السكربت مؤقتاً", inline=False)
-    embed.add_field(name="!resume", value="استئناف السكربت", inline=False)
+    embed.add_field(name="!check <ID>", value="فحص حساب محدد بواسطة User ID", inline=False)
+    embed.add_field(name="!list", value="عرض قائمة مختصرة لجميع الحسابات", inline=False)
+    embed.add_field(name="!notify <ID>", value="إرسال إشعار لحساب معين (يدوياً)", inline=False)
+    embed.set_footer(text="جميع الأوامر خاصة بالمالك فقط")
     await ctx.send(embed=embed)
 
+# ===== أمر عرض الحالة الكاملة =====
 @bot.command(name="status")
 async def status_cmd(ctx):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
-    await ctx.send("⏳ جاري جلب البيانات...")
-    try:
-        resp = requests.get(f"{API_URL}/status", timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            embed = discord.Embed(title="📊 حالة الحسابات", color=0x00ff7f)
-            for acc in data:
-                status_text = acc.get('boost_status', 'غير معروف')
-                embed.add_field(
-                    name=acc.get('username', 'Unknown'),
-                    value=f"🆔 `{acc.get('user_id')}`\n📊 {status_text}",
-                    inline=False
-                )
-            await ctx.send(embed=embed)
+    await ctx.send("⏳ جاري فحص جميع الحسابات...")
+    results = check_all_accounts()
+    embed = discord.Embed(
+        title="📊 Nebula — حالة الحسابات",
+        color=0x00ff7f if any(r.get("status") == "ready" for r in results) else 0xff4444,
+        timestamp=discord.utils.utcnow()
+    )
+    for r in results:
+        if "error" in r:
+            embed.add_field(
+                name="❌ خطأ",
+                value=r["error"],
+                inline=False
+            )
         else:
-            await ctx.send("⚠️ السكربت لا يستجيب.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
+            status_emoji = "✅" if r["status"] == "ready" else "⏳"
+            cooldown_text = ""
+            if r.get("cooldown_timestamp"):
+                cooldown_text = f"\nينتهي: <t:{r['cooldown_timestamp']}:R>"
+            embed.add_field(
+                name=f"{status_emoji} {r['username']}",
+                value=f"🆔 `{r['user_id']}`\n{r['message']}{cooldown_text}",
+                inline=False
+            )
+    embed.set_footer(text=f"عدد الحسابات: {len(results)}")
+    await ctx.send(embed=embed)
 
+# ===== أمر فحص حساب محدد =====
 @bot.command(name="check")
 async def check_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
     await ctx.send(f"⏳ جاري فحص الحساب `{user_id}`...")
-    try:
-        resp = requests.get(f"{API_URL}/check/{user_id}", timeout=15)
-        if resp.status_code == 200:
-            data = resp.json()
+    for token in config.SELF_TOKENS:
+        result = check_account(token)
+        if result.get("user_id") == user_id:
             embed = discord.Embed(
-                title=f"🔍 نتيجة فحص {data.get('username', 'Unknown')}",
-                color=0x00ff7f if data.get('boost_status') == 'ready' else 0xff4444
+                title=f"🔍 نتيجة فحص {result['username']}",
+                color=0x00ff7f if result["status"] == "ready" else 0xff4444,
+                timestamp=discord.utils.utcnow()
             )
-            embed.add_field(name="🆔 ID", value=f"`{data.get('user_id')}`", inline=True)
-            embed.add_field(name="📊 الحالة", value=data.get('boost_status', '—'), inline=False)
-            if data.get('cooldown_ends_at'):
-                embed.add_field(name="⏳ ينتهي", value=f"<t:{int(data['cooldown_ends_at'])}:R>", inline=True)
-            await ctx.send(embed=embed)
-        else:
-            await ctx.send("⚠️ السكربت لا يستجيب.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
-
-@bot.command(name="nitro")
-async def nitro_cmd(ctx):
-    if not is_owner(ctx):
-        return await ctx.send("❌ غير مصرح لك.")
-    await ctx.send("⏳ جاري جلب بيانات Nitro...")
-    try:
-        resp = requests.get(f"{API_URL}/nitro", timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            embed = discord.Embed(title="💎 حالة Nitro", color=0xf47fff)
-            for acc in data:
-                nitro_type = acc.get('nitro_type', 'بدون Nitro')
+            embed.add_field(name="🆔 ID", value=f"`{result['user_id']}`", inline=True)
+            embed.add_field(name="📊 الحالة", value=result["message"], inline=False)
+            if result.get("cooldown_timestamp"):
                 embed.add_field(
-                    name=acc.get('username', 'Unknown'),
-                    value=f"{nitro_type}\n🆔 `{acc.get('user_id')}`",
-                    inline=False
+                    name="⏳ ينتهي",
+                    value=f"<t:{result['cooldown_timestamp']}:F>\n<t:{result['cooldown_timestamp']}:R>",
+                    inline=True
                 )
+            if result.get("server_id"):
+                embed.add_field(name="🏠 آخر سيرفر", value=f"`{result['server_id']}`", inline=True)
             await ctx.send(embed=embed)
-        else:
-            await ctx.send("⚠️ السكربت لا يستجيب.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
+            return
+    await ctx.send(f"❌ لم أجد حساباً بـ ID: `{user_id}`")
 
-@bot.command(name="next")
-async def next_cmd(ctx):
+# ===== أمر قائمة مختصرة =====
+@bot.command(name="list")
+async def list_cmd(ctx):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
-    try:
-        resp = requests.get(f"{API_URL}/next", timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            embed = discord.Embed(
-                title="⏳ أقرب حساب جاهز",
-                color=0xffcc00
-            )
-            embed.add_field(name="👤 الحساب", value=data.get('username', 'Unknown'), inline=True)
-            embed.add_field(name="📊 الحالة", value=data.get('boost_status', '—'), inline=True)
-            if data.get('cooldown_ends_at'):
-                embed.add_field(name="⏳ ينتهي", value=f"<t:{int(data['cooldown_ends_at'])}:R>", inline=True)
-            await ctx.send(embed=embed)
+    await ctx.send("⏳ جاري...")
+    results = check_all_accounts()
+    lines = []
+    for r in results:
+        if "error" in r:
+            lines.append(f"❌ {r['error']}")
         else:
-            await ctx.send("⚠️ السكربت لا يستجيب.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
+            emoji = "✅" if r["status"] == "ready" else "⏳"
+            lines.append(f"{emoji} `{r['username']}` — {r['message']}")
+    embed = discord.Embed(
+        title="📋 قائمة الحسابات",
+        description="\n".join(lines) or "لا توجد بيانات",
+        color=0x00bfff
+    )
+    embed.set_footer(text=f"عدد الحسابات: {len(results)}")
+    await ctx.send(embed=embed)
 
-@bot.command(name="pause")
-async def pause_cmd(ctx):
+# ===== أمر إرسال إشعار يدوي =====
+@bot.command(name="notify")
+async def notify_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ غير مصرح لك.")
-    try:
-        resp = requests.post(f"{API_URL}/pause", timeout=5)
-        if resp.status_code == 200:
-            await ctx.send("⏸️ تم إيقاف السكربت مؤقتاً.")
-        else:
-            await ctx.send("⚠️ فشل إيقاف السكربت.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
+    await ctx.send(f"⏳ جاري البحث عن الحساب `{user_id}`...")
+    for token in config.SELF_TOKENS:
+        result = check_account(token)
+        if result.get("user_id") == user_id:
+            if result["status"] == "ready":
+                send_ready_notification(result["username"], result["user_id"], result.get("cooldown_timestamp"))
+                await ctx.send("✅ تم إرسال إشعار الجاهزية.")
+            else:
+                send_waiting_notification(
+                    result["username"],
+                    result["user_id"],
+                    result["cooldown_timestamp"],
+                    result["message"]
+                )
+                await ctx.send("✅ تم إرسال إشعار الانتظار.")
+            return
+    await ctx.send(f"❌ لم أجد حساباً بـ ID: `{user_id}`")
 
-@bot.command(name="resume")
-async def resume_cmd(ctx):
-    if not is_owner(ctx):
-        return await ctx.send("❌ غير مصرح لك.")
-    try:
-        resp = requests.post(f"{API_URL}/resume", timeout=5)
-        if resp.status_code == 200:
-            await ctx.send("▶️ تم استئناف السكربت.")
-        else:
-            await ctx.send("⚠️ فشل استئناف السكربت.")
-    except Exception as e:
-        await ctx.send(f"❌ خطأ: {str(e)[:50]}")
-
+# ===== تشغيل البوت =====
 def run_bot():
     bot.run(config.BOT_TOKEN)
