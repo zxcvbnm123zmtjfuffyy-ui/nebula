@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: nebula-boost-monitor
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: SELF_TOKENS
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: WEBHOOK_URL
+        sync: false
+      - key: LOG_WEBHOOK_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: ALLOWED_GUILD_ID
+        sync: false
+      - key: MIN_DELAY_SECONDS
+        value: "45"
+      - key: MAX_DELAY_SECONDS
+        value: "90"
