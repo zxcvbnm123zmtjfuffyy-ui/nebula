@@ -1,68 +1,68 @@
 from supabase import create_client, Client
-from datetime import datetime
 import config
-from logger import log_error, log_info
+from logger import log_info, log_error
 
 supabase: Client = None
 
 def init_supabase():
     global supabase
-    if not config.SUPABASE_URL or not config.SUPABASE_KEY:
-        log_info("⚠️ Supabase غير مضبوط، سيتم استخدام JSON محلي")
-        return None
     try:
         supabase = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
         log_info("✅ تم الاتصال بـ Supabase بنجاح")
         return supabase
     except Exception as e:
         log_error(f"❌ فشل الاتصال بـ Supabase: {e}")
+        raise
+
+def get_settings():
+    """جلب الإعدادات من Supabase (التوكنات والويب هوك)"""
+    try:
+        result = supabase.table("settings").select("*").limit(1).execute()
+        if result.data:
+            return result.data[0]
+        return None
+    except Exception as e:
+        log_error(f"فشل جلب الإعدادات: {e}")
         return None
 
-def save_account_data(token: str, data: dict):
-    if not supabase:
-        return None
+def update_settings(settings: dict):
+    """تحديث الإعدادات في Supabase"""
     try:
-        existing = supabase.table("accounts").select("*").eq("token_hash", token[:20]).execute()
+        existing = supabase.table("settings").select("*").limit(1).execute()
         if existing.data:
-            supabase.table("accounts").update({
-                "username": data.get("username"),
-                "user_id": data.get("user_id"),
-                "boost_status": data.get("status"),
-                "cooldown_ends_at": data.get("cooldown_ends"),
-                "last_boost_check": data.get("last_check"),
-                "server_id": data.get("server_id"),
-                "nitro_type": data.get("nitro_type"),
-                "nitro_status": data.get("nitro_status"),
-                "nitro_expires_at": data.get("nitro_expires_at"),
-                "nitro_days_left": data.get("nitro_days_left"),
-                "nitro_last_check": data.get("nitro_last_check"),
-            }).eq("token_hash", token[:20]).execute()
+            supabase.table("settings").update(settings).eq("id", existing.data[0]["id"]).execute()
         else:
-            supabase.table("accounts").insert({
-                "token_hash": token[:20],
-                "username": data.get("username"),
-                "user_id": data.get("user_id"),
-                "boost_status": data.get("status"),
-                "cooldown_ends_at": data.get("cooldown_ends"),
-                "last_boost_check": data.get("last_check"),
-                "server_id": data.get("server_id"),
-                "nitro_type": data.get("nitro_type"),
-                "nitro_status": data.get("nitro_status"),
-                "nitro_expires_at": data.get("nitro_expires_at"),
-                "nitro_days_left": data.get("nitro_days_left"),
-                "nitro_last_check": data.get("nitro_last_check"),
-            }).execute()
-        return True
+            supabase.table("settings").insert(settings).execute()
+        log_info("✅ تم تحديث الإعدادات")
     except Exception as e:
-        log_error(f"فشل حفظ البيانات في Supabase: {e}")
-        return None
+        log_error(f"فشل تحديث الإعدادات: {e}")
 
-def get_all_accounts():
-    if not supabase:
-        return []
-    try:
-        result = supabase.table("accounts").select("*").execute()
-        return result.data
-    except Exception as e:
-        log_error(f"فشل جلب البيانات من Supabase: {e}")
-        return []
+def get_tokens():
+    """جلب قائمة التوكنات من Supabase"""
+    settings = get_settings()
+    if settings and settings.get("tokens"):
+        return [t.strip() for t in settings["tokens"].split(",") if t.strip()]
+    return []
+
+def update_tokens(tokens: list):
+    """تحديث قائمة التوكنات"""
+    settings = get_settings() or {}
+    settings["tokens"] = ",".join(tokens)
+    update_settings(settings)
+
+def get_webhooks():
+    """جلب روابط الويب هوك"""
+    settings = get_settings()
+    if settings:
+        return {
+            "webhook_url": settings.get("webhook_url", ""),
+            "log_webhook_url": settings.get("log_webhook_url", "")
+        }
+    return {"webhook_url": "", "log_webhook_url": ""}
+
+def update_webhooks(webhook_url: str, log_webhook_url: str):
+    """تحديث روابط الويب هوك"""
+    settings = get_settings() or {}
+    settings["webhook_url"] = webhook_url
+    settings["log_webhook_url"] = log_webhook_url
+    update_settings(settings)

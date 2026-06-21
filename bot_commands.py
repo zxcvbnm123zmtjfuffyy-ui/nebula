@@ -1,28 +1,24 @@
 import discord
 from discord.ext import commands
 import config
-from boost_checker import check_account, check_all_accounts
+from boost_checker import check_account, check_all_accounts, search_account_by_username
 from nitro_checker import check_nitro, check_all_nitro
 from notifier import send_ready_notification, send_waiting_notification
 from embeds import build_boost_embed, build_nitro_embed
 from logger import log_info
 
-# ===== إعداد البوت =====
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 bot.remove_command('help')
 
-# ===== إيموجي التحميل =====
 LOADING_EMOJI = "<a:1000060120:1516852528631779460>"
 
-# ===== حدث الجاهزية =====
 @bot.event
 async def on_ready():
     print(f"✅ البوت جاهز: {bot.user}")
     await bot.change_presence(activity=discord.Game(name="!مساعدة"))
 
-# ===== التحقق من المالك =====
 def is_owner(ctx):
     return ctx.author.id == config.OWNER_ID
 
@@ -35,21 +31,10 @@ async def help_cmd(ctx):
         description="**البوت خاص بمراقبة حسابات Boost و Nitro**",
         color=0x00bfff
     )
-    embed.add_field(
-        name="**!مساعدة**",
-        value="عرض هذه القائمة",
-        inline=False
-    )
-    embed.add_field(
-        name="**!فحص <ID>**",
-        value="فحص حساب محدد بواسطة **User ID**\nمثال: `!فحص 1234567890`",
-        inline=False
-    )
-    embed.add_field(
-        name="**!نيترو <ID>**",
-        value="عرض حالة **Nitro** لحساب معين (بدون ID: أول حساب)\nمثال: `!نيترو 1234567890`",
-        inline=False
-    )
+    embed.add_field(name="**!مساعدة**", value="عرض هذه القائمة", inline=False)
+    embed.add_field(name="**!فحص <ID>**", value="فحص حساب محدد بـ **User ID**", inline=False)
+    embed.add_field(name="**!بحث <اسم>**", value="البحث عن حساب بالاسم", inline=False)
+    embed.add_field(name="**!نيترو <ID>**", value="عرض Nitro لحساب (بدون ID: أول حساب)", inline=False)
     embed.add_field(
         name="🔒 **أوامر المالك**",
         value="`!حالة` – عرض جميع الحسابات\n`!قائمة` – قائمة مختصرة\n`!إشعار <ID>` – إرسال إشعار",
@@ -60,10 +45,10 @@ async def help_cmd(ctx):
 
 @bot.command(name="فحص")
 async def check_cmd(ctx, user_id: str):
-    """فحص حساب محدد (عام)"""
     loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري فحص الحساب** `{user_id}` **...**")
     try:
-        for token in config.SELF_TOKENS:
+        from supabase_client import get_tokens
+        for token in get_tokens():
             result = check_account(token)
             if result.get("user_id") == user_id:
                 embed = build_boost_embed(result)
@@ -74,11 +59,23 @@ async def check_cmd(ctx, user_id: str):
     except Exception as e:
         await loading_msg.edit(content=f"❌ **حدث خطأ:** {str(e)[:100]}", embed=None)
 
+@bot.command(name="بحث")
+async def search_cmd(ctx, username: str):
+    loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري البحث عن** `{username}` **...**")
+    result = search_account_by_username(username)
+    if result:
+        embed = build_boost_embed(result)
+        await loading_msg.edit(content=None, embed=embed)
+        log_info(f"🔍 بحث عن {username} بواسطة {ctx.author}")
+    else:
+        await loading_msg.edit(content=f"❌ **لم أجد حساباً باسم:** `{username}`", embed=None)
+
 @bot.command(name="نيترو")
 async def nitro_cmd(ctx, user_id: str = None):
-    """عرض حالة Nitro (عام)"""
+    from supabase_client import get_tokens
+    tokens = get_tokens()
     if user_id is None:
-        token = config.SELF_TOKENS[0]
+        token = tokens[0]
         loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري جلب بيانات Nitro للحساب الأول...**")
         result = check_nitro(token)
         if "error" in result:
@@ -89,7 +86,7 @@ async def nitro_cmd(ctx, user_id: str = None):
         log_info(f"✅ Nitro عام (أول حساب) بواسطة {ctx.author}")
     else:
         loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري جلب بيانات Nitro للحساب** `{user_id}` **...**")
-        for token in config.SELF_TOKENS:
+        for token in tokens:
             result = check_nitro(token)
             if result.get("user_id") == user_id:
                 embed = build_nitro_embed(result)
@@ -143,7 +140,8 @@ async def notify_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ **غير مصرح لك.**")
     loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري البحث عن الحساب** `{user_id}` **...**")
-    for token in config.SELF_TOKENS:
+    from supabase_client import get_tokens
+    for token in get_tokens():
         result = check_account(token)
         if result.get("user_id") == user_id:
             if result["status"] == "ready":
@@ -161,6 +159,5 @@ async def notify_cmd(ctx, user_id: str):
             return
     await loading_msg.edit(content=f"❌ **لم أجد حساباً بـ ID:** `{user_id}`", embed=None)
 
-# ===== تشغيل البوت =====
 def run_bot():
     bot.run(config.BOT_TOKEN)

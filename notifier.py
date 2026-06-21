@@ -1,14 +1,17 @@
 import requests
 from datetime import datetime, timezone
-import config
 from logger import log_info, log_error
+from supabase_client import get_webhooks
 
 def send_webhook(embed_data: dict):
-    if not config.WEBHOOK_URL:
+    webhooks = get_webhooks()
+    webhook_url = webhooks.get("webhook_url")
+    if not webhook_url:
+        log_error("❌ ويب هوك الإشعارات غير مضبوط")
         return
     payload = {"username": "Nebula", "embeds": [embed_data]}
     try:
-        resp = requests.post(config.WEBHOOK_URL, json=payload, timeout=10)
+        resp = requests.post(webhook_url, json=payload, timeout=10)
         if resp.status_code in (200, 204):
             log_info("✅ تم إرسال الإشعار")
         else:

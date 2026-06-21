@@ -88,8 +88,9 @@ def check_nitro(token: str) -> dict:
     }
 
 def check_all_nitro() -> list:
+    from supabase_client import get_tokens
+    tokens = get_tokens()
     results = []
-    tokens = config.SELF_TOKENS.copy()
     random.shuffle(tokens)
     for i, token in enumerate(tokens):
         log_info(f"💎 [{i+1}/{len(tokens)}]")

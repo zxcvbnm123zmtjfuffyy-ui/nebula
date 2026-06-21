@@ -3,7 +3,7 @@ import random
 import time
 from datetime import datetime, timezone, timedelta
 import config
-from logger import log_info, log_warning, log_error
+from logger import log_info, log_warning, log_error, log_success
 
 _account_cache = {}
 
@@ -61,6 +61,36 @@ def get_boost_slots(token: str, retry: int = 0) -> list:
     except Exception as e:
         log_error(f"فشل جلب Boost: {e}")
         return None
+
+def auto_ping_token(token: str) -> bool:
+    try:
+        resp = requests.get(
+            "https://discord.com/api/v9/users/@me",
+            headers=get_headers(token),
+            timeout=10
+        )
+        if resp.status_code == 200:
+            return True
+        elif resp.status_code == 401:
+            log_warning(f"⚠️ توكن منتهي: {token[:15]}...")
+            return False
+        return False
+    except Exception as e:
+        log_error(f"Auto-Ping فشل: {e}")
+        return False
+
+def auto_ping_all():
+    log_info("🔄 Auto-Ping: جاري تحديث نشاط الحسابات...")
+    from supabase_client import get_tokens
+    tokens = get_tokens()
+    random.shuffle(tokens)
+    for token in tokens:
+        if auto_ping_token(token):
+            log_info(f"✅ {token[:15]}... نشط")
+        else:
+            log_warning(f"⚠️ {token[:15]}... غير نشط")
+        time.sleep(random.uniform(2, 5))
+    log_success("✅ انتهى Auto-Ping")
 
 def check_account(token: str) -> dict:
     log_info(f"🔍 فحص: {token[:15]}...")
@@ -126,8 +156,9 @@ def check_account(token: str) -> dict:
         }
 
 def check_all_accounts() -> list:
+    from supabase_client import get_tokens
+    tokens = get_tokens()
     results = []
-    tokens = config.SELF_TOKENS.copy()
     random.shuffle(tokens)
     for i, token in enumerate(tokens):
         log_info(f"📌 [{i+1}/{len(tokens)}]")
@@ -136,3 +167,12 @@ def check_all_accounts() -> list:
             delay = random.uniform(config.MIN_DELAY_SECONDS, config.MAX_DELAY_SECONDS)
             time.sleep(delay)
     return results
+
+def search_account_by_username(username: str) -> dict:
+    from supabase_client import get_tokens
+    tokens = get_tokens()
+    for token in tokens:
+        info = get_account_info(token)
+        if info and info.get("username", "").lower() == username.lower():
+            return check_account(token)
+    return None

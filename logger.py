@@ -1,7 +1,7 @@
 import logging
 import requests
 from datetime import datetime
-import config
+from supabase_client import get_webhooks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -14,7 +14,9 @@ logging.basicConfig(
 logger = logging.getLogger("Nebula")
 
 def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
-    if not config.LOG_WEBHOOK_URL:
+    webhooks = get_webhooks()
+    log_webhook_url = webhooks.get("log_webhook_url")
+    if not log_webhook_url:
         return
     colors = {"INFO": 0x00bfff, "SUCCESS": 0x00ff00, "WARNING": 0xffcc00, "ERROR": 0xff0000}
     embed = {
@@ -32,7 +34,7 @@ def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None)
             for k, v in details.items()
         ]
     try:
-        requests.post(config.LOG_WEBHOOK_URL, json=embed, timeout=5)
+        requests.post(log_webhook_url, json=embed, timeout=5)
     except Exception as e:
         logger.error(f"فشل إرسال سجل للويب هوك: {e}")
 
