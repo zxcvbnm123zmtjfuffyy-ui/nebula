@@ -15,10 +15,14 @@ def init_supabase():
         raise
 
 def get_settings():
+    """جلب الإعدادات من Supabase مع تعطيل التخزين المؤقت"""
     try:
         if not supabase:
             return None
-        result = supabase.table("settings").select("*").limit(1).execute()
+        # ✅ إضافة headers لمنع التخزين المؤقت
+        result = supabase.table("settings").select("*").limit(1).execute(
+            headers={"Cache-Control": "no-cache"}
+        )
         if result.data:
             return result.data[0]
         return None
@@ -27,11 +31,14 @@ def get_settings():
         return None
 
 def update_settings(settings: dict):
+    """تحديث الإعدادات في Supabase"""
     try:
         if not supabase:
             print("[⚠️] Supabase غير متصل، لا يمكن تحديث الإعدادات")
             return
-        existing = supabase.table("settings").select("*").limit(1).execute()
+        existing = supabase.table("settings").select("*").limit(1).execute(
+            headers={"Cache-Control": "no-cache"}
+        )
         if existing.data:
             supabase.table("settings").update(settings).eq("id", existing.data[0]["id"]).execute()
         else:
@@ -41,6 +48,7 @@ def update_settings(settings: dict):
         print(f"[❌] فشل تحديث الإعدادات: {e}")
 
 def get_tokens():
+    """جلب قائمة التوكنات (من Supabase أو البيئة)"""
     settings = get_settings()
     if settings and settings.get("tokens"):
         tokens_str = settings["tokens"].strip()

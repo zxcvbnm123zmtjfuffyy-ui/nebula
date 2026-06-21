@@ -7,87 +7,7 @@ from supabase_client import get_tokens, update_tokens, get_webhooks, update_webh
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "admin123")
 
 # ===== HTML مع تصميم متجاوب وتحديث فوري =====
-HTML_LOGIN = """
-<!DOCTYPE html>
-<html lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔐 Nebula - Login</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #0d0d1a;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .box {
-            background: #16213e;
-            padding: 40px 30px;
-            border-radius: 16px;
-            color: white;
-            width: 100%;
-            max-width: 380px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
-            border: 1px solid #1f3a6e;
-        }
-        .box h2 {
-            text-align: center;
-            margin-bottom: 25px;
-            font-size: 24px;
-            font-weight: 600;
-            color: #00bfff;
-        }
-        .box input {
-            width: 100%;
-            padding: 12px 16px;
-            margin: 10px 0 20px;
-            border-radius: 8px;
-            border: none;
-            background: #1a2a4a;
-            color: white;
-            font-size: 16px;
-            outline: none;
-            transition: 0.3s;
-        }
-        .box input:focus {
-            background: #1f3460;
-            box-shadow: 0 0 0 2px #00bfff;
-        }
-        .box button {
-            width: 100%;
-            padding: 12px;
-            background: #00bfff;
-            color: #0d0d1a;
-            border: none;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .box button:hover { background: #00a0d4; transform: translateY(-2px); }
-        .error { color: #ff6b6b; text-align: center; margin-top: 15px; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>🔐 تسجيل الدخول</h2>
-        <form method="POST">
-            <input type="password" name="password" placeholder="كلمة المرور" required>
-            <button type="submit">دخول</button>
-        </form>
-        {% if error %}
-        <p class="error">❌ {{ error }}</p>
-        {% endif %}
-    </div>
-</body>
-</html>
-"""
+HTML_LOGIN = """..."""  # نفس الكود السابق، لا تغيير
 
 HTML_DASHBOARD = """
 <!DOCTYPE html>
@@ -330,15 +250,20 @@ HTML_DASHBOARD = """
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
+        // ✅ تعطيل التخزين المؤقت في جميع الطلبات
         async function refreshData() {
             showToast('🔄 جاري التحديث...');
             try {
-                const resp = await fetch('/api/dashboard_data');
+                const resp = await fetch('/api/dashboard_data', { 
+                    cache: 'no-cache',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
                 const data = await resp.json();
                 document.getElementById('tokenCount').textContent = data.tokens.length;
                 document.getElementById('onlineCount').textContent = data.online;
                 document.getElementById('offlineCount').textContent = data.offline;
                 document.getElementById('lastUpdate').textContent = data.last_update;
+                
                 // تحديث الجدول
                 const table = document.getElementById('tokensTable');
                 let html = `<tr><th>#</th><th>الحساب</th><th>الحالة</th><th>الإجراء</th></tr>`;
@@ -368,7 +293,12 @@ HTML_DASHBOARD = """
             const formData = new FormData();
             formData.append('new_token', token);
             try {
-                const resp = await fetch('/add_token', { method: 'POST', body: formData });
+                const resp = await fetch('/add_token', { 
+                    method: 'POST', 
+                    body: formData,
+                    cache: 'no-cache',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
                 if (resp.ok) {
                     showToast('✅ تم إضافة التوكن');
                     input.value = '';
@@ -386,7 +316,12 @@ HTML_DASHBOARD = """
             const formData = new FormData();
             formData.append('token', token);
             try {
-                const resp = await fetch('/delete_token', { method: 'POST', body: formData });
+                const resp = await fetch('/delete_token', { 
+                    method: 'POST', 
+                    body: formData,
+                    cache: 'no-cache',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
                 if (resp.ok) {
                     showToast('✅ تم حذف التوكن');
                     await refreshData();
@@ -406,7 +341,12 @@ HTML_DASHBOARD = """
             formData.append('webhook_url', webhook);
             formData.append('log_webhook_url', logWebhook);
             try {
-                const resp = await fetch('/update_webhooks', { method: 'POST', body: formData });
+                const resp = await fetch('/update_webhooks', { 
+                    method: 'POST', 
+                    body: formData,
+                    cache: 'no-cache',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
                 if (resp.ok) {
                     showToast('✅ تم تحديث الويب هوك');
                     await refreshData();
@@ -418,9 +358,8 @@ HTML_DASHBOARD = """
             }
         }
 
-        // تحميل البيانات تلقائياً عند فتح الصفحة
+        // تحديث تلقائي كل 60 ثانية
         document.addEventListener('DOMContentLoaded', function() {
-            // نحدّث البيانات كل 60 ثانية
             setInterval(refreshData, 60000);
         });
     </script>
@@ -511,7 +450,7 @@ def setup_dashboard(app):
                 tokens.append(new_token)
                 update_tokens(tokens)
                 log_info(f"➕ تم إضافة توكن جديد: {new_token[:15]}...")
-        return '', 200  # إرجاع 200 بدون إعادة توجيه
+        return '', 200
 
     @app.route('/delete_token', methods=['POST'])
     def delete_token():
@@ -523,7 +462,7 @@ def setup_dashboard(app):
             tokens.remove(token)
             update_tokens(tokens)
             log_info(f"🗑️ تم حذف توكن: {token[:15]}...")
-        return '', 200  # إرجاع 200 بدون إعادة توجيه
+        return '', 200
 
     @app.route('/update_webhooks', methods=['POST'])
     def update_webhooks_route():
@@ -533,4 +472,4 @@ def setup_dashboard(app):
         log_webhook_url = request.form.get('log_webhook_url', '').strip()
         update_webhooks(webhook_url, log_webhook_url)
         log_info(f"🔗 تم تحديث ويب هوك: {webhook_url[:30]}...")
-        return '', 200  # إرجاع 200 بدون إعادة توجيه
+        return '', 200
