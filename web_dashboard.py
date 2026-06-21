@@ -6,7 +6,7 @@ from supabase_client import get_tokens, update_tokens, get_webhooks, update_webh
 
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "admin123")
 
-# ===== HTML مع تصميم متجاوب =====
+# ===== HTML مع تصميم متجاوب وتحديث فوري =====
 HTML_LOGIN = """
 <!DOCTYPE html>
 <html lang="ar">
@@ -267,7 +267,7 @@ HTML_DASHBOARD = """
                 <button type="submit" class="btn btn-primary">إضافة</button>
             </form>
             <div style="overflow-x: auto;">
-                <table>
+                <table id="tokensTable">
                     <tr>
                         <th>#</th>
                         <th>الحساب</th>
@@ -340,7 +340,7 @@ HTML_DASHBOARD = """
                 document.getElementById('offlineCount').textContent = data.offline;
                 document.getElementById('lastUpdate').textContent = data.last_update;
                 // تحديث الجدول
-                const table = document.querySelector('table');
+                const table = document.getElementById('tokensTable');
                 let html = `<tr><th>#</th><th>الحساب</th><th>الحالة</th><th>الإجراء</th></tr>`;
                 data.tokens.forEach((t, i) => {
                     const statusClass = t.status === 'online' ? 'online' : 'offline';
@@ -372,7 +372,7 @@ HTML_DASHBOARD = """
                 if (resp.ok) {
                     showToast('✅ تم إضافة التوكن');
                     input.value = '';
-                    setTimeout(refreshData, 500);
+                    await refreshData();
                 } else {
                     showToast('❌ فشل إضافة التوكن', true);
                 }
@@ -389,7 +389,7 @@ HTML_DASHBOARD = """
                 const resp = await fetch('/delete_token', { method: 'POST', body: formData });
                 if (resp.ok) {
                     showToast('✅ تم حذف التوكن');
-                    setTimeout(refreshData, 500);
+                    await refreshData();
                 } else {
                     showToast('❌ فشل حذف التوكن', true);
                 }
@@ -409,7 +409,7 @@ HTML_DASHBOARD = """
                 const resp = await fetch('/update_webhooks', { method: 'POST', body: formData });
                 if (resp.ok) {
                     showToast('✅ تم تحديث الويب هوك');
-                    setTimeout(refreshData, 500);
+                    await refreshData();
                 } else {
                     showToast('❌ فشل تحديث الويب هوك', true);
                 }
@@ -417,6 +417,12 @@ HTML_DASHBOARD = """
                 showToast('❌ خطأ في الاتصال', true);
             }
         }
+
+        // تحميل البيانات تلقائياً عند فتح الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            // نحدّث البيانات كل 60 ثانية
+            setInterval(refreshData, 60000);
+        });
     </script>
 </body>
 </html>
@@ -505,7 +511,7 @@ def setup_dashboard(app):
                 tokens.append(new_token)
                 update_tokens(tokens)
                 log_info(f"➕ تم إضافة توكن جديد: {new_token[:15]}...")
-        return redirect('/dashboard')
+        return '', 200  # إرجاع 200 بدون إعادة توجيه
 
     @app.route('/delete_token', methods=['POST'])
     def delete_token():
@@ -517,7 +523,7 @@ def setup_dashboard(app):
             tokens.remove(token)
             update_tokens(tokens)
             log_info(f"🗑️ تم حذف توكن: {token[:15]}...")
-        return redirect('/dashboard')
+        return '', 200  # إرجاع 200 بدون إعادة توجيه
 
     @app.route('/update_webhooks', methods=['POST'])
     def update_webhooks_route():
@@ -527,4 +533,4 @@ def setup_dashboard(app):
         log_webhook_url = request.form.get('log_webhook_url', '').strip()
         update_webhooks(webhook_url, log_webhook_url)
         log_info(f"🔗 تم تحديث ويب هوك: {webhook_url[:30]}...")
-        return redirect('/dashboard')
+        return '', 200  # إرجاع 200 بدون إعادة توجيه
