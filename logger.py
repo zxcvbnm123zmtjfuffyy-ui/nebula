@@ -1,8 +1,8 @@
 import logging
 import requests
 from datetime import datetime
-from supabase_client import get_webhooks
 
+# ===== إعدادات التسجيل =====
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,11 +14,21 @@ logging.basicConfig(
 logger = logging.getLogger("Nebula")
 
 def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
+    """إرسال سجل إلى ويب هوك السجلات (استيراد متأخر لتجنب الاستيراد الدائري)"""
+    # ✅ استيراد متأخر لتجنب الاستيراد الدائري
+    from supabase_client import get_webhooks
     webhooks = get_webhooks()
     log_webhook_url = webhooks.get("log_webhook_url")
     if not log_webhook_url:
         return
-    colors = {"INFO": 0x00bfff, "SUCCESS": 0x00ff00, "WARNING": 0xffcc00, "ERROR": 0xff0000}
+    
+    colors = {
+        "INFO": 0x00bfff,
+        "SUCCESS": 0x00ff00,
+        "WARNING": 0xffcc00,
+        "ERROR": 0xff0000
+    }
+    
     embed = {
         "embeds": [{
             "title": f"📋 Nebula - {level}",
@@ -28,11 +38,13 @@ def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None)
             "footer": {"text": "Nebula Monitor"}
         }]
     }
+    
     if details:
         embed["embeds"][0]["fields"] = [
             {"name": k, "value": str(v)[:100], "inline": True}
             for k, v in details.items()
         ]
+    
     try:
         requests.post(log_webhook_url, json=embed, timeout=5)
     except Exception as e:
