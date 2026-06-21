@@ -80,8 +80,8 @@ def auto_ping_token(token: str) -> bool:
         return False
 
 def auto_ping_all():
-    log_info("🔄 Auto-Ping: جاري تحديث نشاط الحسابات...")
     from supabase_client import get_tokens
+    log_info("🔄 Auto-Ping: جاري تحديث نشاط الحسابات...")
     tokens = get_tokens()
     random.shuffle(tokens)
     for token in tokens:

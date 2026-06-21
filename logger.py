@@ -1,8 +1,8 @@
 import logging
 import requests
 from datetime import datetime
+import os
 
-# ===== إعدادات التسجيل =====
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -14,11 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger("Nebula")
 
 def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
-    """إرسال سجل إلى ويب هوك السجلات (استيراد متأخر لتجنب الاستيراد الدائري)"""
-    # ✅ استيراد متأخر لتجنب الاستيراد الدائري
-    from supabase_client import get_webhooks
-    webhooks = get_webhooks()
-    log_webhook_url = webhooks.get("log_webhook_url")
+    log_webhook_url = os.getenv("LOG_WEBHOOK_URL")
     if not log_webhook_url:
         return
     
