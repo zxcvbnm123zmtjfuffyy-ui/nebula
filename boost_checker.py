@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 import config
 from logger import log_info, log_warning, log_error, log_success
+from supabase_client import get_tokens
 
 _account_cache = {}
 
@@ -80,7 +81,6 @@ def auto_ping_token(token: str) -> bool:
         return False
 
 def auto_ping_all():
-    from supabase_client import get_tokens
     log_info("🔄 Auto-Ping: جاري تحديث نشاط الحسابات...")
     tokens = get_tokens()
     random.shuffle(tokens)
@@ -156,7 +156,6 @@ def check_account(token: str) -> dict:
         }
 
 def check_all_accounts() -> list:
-    from supabase_client import get_tokens
     tokens = get_tokens()
     results = []
     random.shuffle(tokens)
@@ -169,7 +168,6 @@ def check_all_accounts() -> list:
     return results
 
 def search_account_by_username(username: str) -> dict:
-    from supabase_client import get_tokens
     tokens = get_tokens()
     for token in tokens:
         info = get_account_info(token)

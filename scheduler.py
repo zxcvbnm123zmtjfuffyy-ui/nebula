@@ -41,8 +41,6 @@ class Scheduler:
     def run_checks(self):
         log_info("🔄 بدء الفحص الدوري الشامل...")
         from notifier import send_ready_notification
-        from supabase_client import get_webhooks
-        from boost_checker import check_all_accounts
         
         results = check_all_accounts()
         ready_count = 0

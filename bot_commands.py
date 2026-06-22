@@ -6,6 +6,7 @@ from nitro_checker import check_nitro, check_all_nitro
 from notifier import send_ready_notification, send_waiting_notification
 from embeds import build_boost_embed, build_nitro_embed
 from logger import log_info
+from supabase_client import get_tokens
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -47,7 +48,6 @@ async def help_cmd(ctx):
 async def check_cmd(ctx, user_id: str):
     loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري فحص الحساب** `{user_id}` **...**")
     try:
-        from supabase_client import get_tokens
         for token in get_tokens():
             result = check_account(token)
             if result.get("user_id") == user_id:
@@ -72,7 +72,6 @@ async def search_cmd(ctx, username: str):
 
 @bot.command(name="نيترو")
 async def nitro_cmd(ctx, user_id: str = None):
-    from supabase_client import get_tokens
     tokens = get_tokens()
     if user_id is None:
         token = tokens[0]
@@ -140,7 +139,6 @@ async def notify_cmd(ctx, user_id: str):
     if not is_owner(ctx):
         return await ctx.send("❌ **غير مصرح لك.**")
     loading_msg = await ctx.send(f"{LOADING_EMOJI} **جاري البحث عن الحساب** `{user_id}` **...**")
-    from supabase_client import get_tokens
     for token in get_tokens():
         result = check_account(token)
         if result.get("user_id") == user_id:

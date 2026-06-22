@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import config
 from logger import log_info, log_warning, log_error
 from boost_checker import get_account_info
+from supabase_client import get_tokens
 
 def get_headers(token: str) -> dict:
     return {
@@ -88,7 +89,6 @@ def check_nitro(token: str) -> dict:
     }
 
 def check_all_nitro() -> list:
-    from supabase_client import get_tokens
     tokens = get_tokens()
     results = []
     random.shuffle(tokens)

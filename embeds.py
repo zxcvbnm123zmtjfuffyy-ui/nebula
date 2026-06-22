@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Dict
 
 def build_boost_embed(result: Dict) -> discord.Embed:
-    """بناء إمبد احترافي مع Markdown لنتيجة فحص Boost"""
     username = result.get("username", "Unknown")
     user_id = result.get("user_id", "???")
     avatar_url = result.get("avatar_url")
@@ -83,9 +82,7 @@ def build_boost_embed(result: Dict) -> discord.Embed:
     embed.set_footer(text=f"Nebula Monitor • {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}")
     return embed
 
-
 def build_nitro_embed(result: Dict) -> discord.Embed:
-    """بناء إمبد Nitro مع Markdown"""
     username = result.get("username", "Unknown")
     user_id = result.get("user_id", "???")
     nitro_type = result.get("nitro_type", "بدون Nitro")

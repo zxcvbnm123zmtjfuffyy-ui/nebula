@@ -13,8 +13,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Nebula")
 
+def _get_log_webhook():
+    """جلب رابط ويب هوك السجلات (تجنب الاستيراد الدائري)"""
+    try:
+        from supabase_client import get_webhooks
+        return get_webhooks().get("log_webhook_url", "")
+    except:
+        return os.getenv("LOG_WEBHOOK_URL", "")
+
 def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
-    log_webhook_url = os.getenv("LOG_WEBHOOK_URL")
+    log_webhook_url = _get_log_webhook()
     if not log_webhook_url:
         return
     
