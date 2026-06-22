@@ -1,71 +1,52 @@
-import logging
 import requests
-from datetime import datetime
-import os
+from datetime import datetime, timezone
+from logger import log_info, log_error
+from supabase_client import get_webhooks
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("nebula.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("Nebula")
-
-def _get_log_webhook():
-    """جلب رابط ويب هوك السجلات (تجنب الاستيراد الدائري)"""
-    try:
-        from supabase_client import get_webhooks
-        return get_webhooks().get("log_webhook_url", "")
-    except:
-        return os.getenv("LOG_WEBHOOK_URL", "")
-
-def send_log_to_webhook(message: str, level: str = "INFO", details: dict = None):
-    log_webhook_url = _get_log_webhook()
-    if not log_webhook_url:
+def send_webhook(embed_data: dict):
+    webhooks = get_webhooks()
+    webhook_url = webhooks.get("webhook_url")
+    if not webhook_url:
+        log_error("❌ ويب هوك الإشعارات غير مضبوط")
         return
-    
-    colors = {
-        "INFO": 0x00bfff,
-        "SUCCESS": 0x00ff00,
-        "WARNING": 0xffcc00,
-        "ERROR": 0xff0000
-    }
-    
-    embed = {
-        "embeds": [{
-            "title": f"📋 Nebula - {level}",
-            "description": message,
-            "color": colors.get(level, 0x00bfff),
-            "timestamp": datetime.now().isoformat(),
-            "footer": {"text": "Nebula Monitor"}
-        }]
-    }
-    
-    if details:
-        embed["embeds"][0]["fields"] = [
-            {"name": k, "value": str(v)[:100], "inline": True}
-            for k, v in details.items()
-        ]
-    
+    payload = {"username": "Nebula", "embeds": [embed_data]}
     try:
-        requests.post(log_webhook_url, json=embed, timeout=5)
+        resp = requests.post(webhook_url, json=payload, timeout=10)
+        if resp.status_code in (200, 204):
+            log_info("✅ تم إرسال الإشعار")
+        else:
+            log_error(f"فشل إرسال الإشعار: {resp.status_code}")
     except Exception as e:
-        logger.error(f"فشل إرسال سجل للويب هوك: {e}")
+        log_error(f"فشل إرسال الإشعار: {e}")
 
-def log_info(message: str, details: dict = None):
-    logger.info(message)
-    send_log_to_webhook(message, "INFO", details)
+def send_ready_notification(username: str, user_id: str, cooldown_ts: int = None):
+    embed = {
+        "title": "🚀 **حساب جاهز للبوست!**",
+        "description": f"الحساب **{username}** أصبح جاهزاً.",
+        "color": 0x00ff7f,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "fields": [
+            {"name": "👤 **اليوزر**", "value": f"**{username}**", "inline": True},
+            {"name": "🆔 **ID**", "value": f"`{user_id}`", "inline": True},
+        ],
+        "footer": {"text": "Nebula Monitor"}
+    }
+    if cooldown_ts:
+        embed["fields"].append({"name": "⏳ **انتهاء التبريد**", "value": f"<t:{cooldown_ts}:F>", "inline": True})
+    send_webhook(embed)
 
-def log_success(message: str, details: dict = None):
-    logger.info(f"✅ {message}")
-    send_log_to_webhook(f"✅ {message}", "SUCCESS", details)
-
-def log_warning(message: str, details: dict = None):
-    logger.warning(f"⚠️ {message}")
-    send_log_to_webhook(f"⚠️ {message}", "WARNING", details)
-
-def log_error(message: str, details: dict = None):
-    logger.error(f"❌ {message}")
-    send_log_to_webhook(f"❌ {message}", "ERROR", details)
+def send_waiting_notification(username: str, user_id: str, cooldown_ts: int, remaining_text: str):
+    embed = {
+        "title": "⏳ **حساب في فترة التبريد**",
+        "description": f"الحساب **{username}** لا يزال في الانتظار.",
+        "color": 0xff4444,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "fields": [
+            {"name": "👤 **اليوزر**", "value": f"**{username}**", "inline": True},
+            {"name": "🆔 **ID**", "value": f"`{user_id}`", "inline": True},
+            {"name": "⏳ **الوقت المتبقي**", "value": remaining_text, "inline": True},
+            {"name": "📅 **ينتهي**", "value": f"<t:{cooldown_ts}:R>", "inline": True},
+        ],
+        "footer": {"text": "Nebula Monitor"}
+    }
+    send_webhook(embed)
